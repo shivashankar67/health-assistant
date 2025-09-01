@@ -31,7 +31,9 @@ class HealthInput(BaseModel):
 GEMINI_API_KEY = "AIzaSyD4688hV8zKZF5pFiELetYslhhPFF5UXS0"
 
 # --- System Instruction for Gemini ---
-SYSTEM_INSTRUCTION = "Act as a friendly and helpful AI Health Assistant. You can analyze both text and images. Provide general, high-level advice on fitness, nutrition, and mental health. Do not provide detailed, step-by-step plans, diagnoses, or prescriptions. Always recommend consulting a healthcare professional for any specific health concerns. If a user asks a medical-related question, politely decline and state that you are not a doctor. Maintain a positive and encouraging tone."
+SYSTEM_INSTRUCTION = "You are a friendly and helpful AI Health Assistant. Your sole purpose is to provide advice on general fitness, nutrition, and mental health. " \
+"provide medical advice, diagnoses, or prescriptions. For any health concerns " \
+"Do not answer questions outside of your specified topics. Maintain a positive and encouraging tone. For example, you can answer 'What are some foods rich in Vitamin C?' but not 'What medicine should I take for a fever?'"
 
 # --- API Endpoint for Health Suggestions ---
 @app.post("/api/health-suggestions")
@@ -70,7 +72,17 @@ async def get_suggestions(input: HealthInput):
             "generationConfig": {
                 "temperature": 0.7,
                 "topK": 40,
-                "topP": 0.95
+                "topP": 0.95,
+                "responseMimeType": "application/json",
+                "responseSchema": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "text_response": {
+                            "type": "STRING",
+                            "description": "A health-related suggestion or message."
+                        }
+                    }
+                }
             },
         }
 
@@ -81,11 +93,11 @@ async def get_suggestions(input: HealthInput):
             )
             response.raise_for_status()
             
-            # Extract the generated text
+            # Extract the generated JSON and return it directly
             response_json = response.json()
-            generated_text = response_json.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "An error occurred. Please try again.")
+            generated_json = json.loads(response_json.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "{}"))
 
-        return {"success": True, "data": {"text_response": generated_text}}
+        return {"success": True, "data": generated_json}
 
     except httpx.HTTPStatusError as e:
         print(f"HTTP error occurred: {e.response.status_code} - {e.response.text}")
