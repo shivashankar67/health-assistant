@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Health Assistant</title>
+    <!-- Use Tailwind CSS for rapid styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for a cleaner look */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .container {
+            max-width: 900px;
+        }
+        .message-box {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <!-- Main Application Container -->
+    <div class="container bg-white shadow-xl rounded-2xl overflow-hidden md:flex flex-row-reverse w-full">
+
+        <!-- Sidebar / Header Section -->
+        <div class="md:w-1/3 bg-blue-600 text-white p-6 flex flex-col items-center justify-center text-center">
+            <div class="mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-blue-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13m-2 4H9C7.343 20 6 18.657 6 17V4a3 3 0 016 0v13a3 3 0 01-6 0v-4" />
+                </svg>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-bold mb-2">AI Health Assistant</h1>
+            <p class="text-blue-200 text-sm md:text-base">Your personalized guide to a healthier life. Get tailored advice on fitness, nutrition, and mental well-being.</p>
+        </div>
+        
+        <!-- Main Chat/Content Section -->
+        <div class="md:w-2/3 p-6 md:p-10 flex flex-col justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">How can I help you today?</h2>
+                <!-- Response Area -->
+                <div id="response-area" class="bg-gray-50 p-4 rounded-xl border border-gray-200 transition-all duration-300 min-h-[150px] flex items-center justify-center text-gray-500 text-center">
+                    <p>Enter a query in the form below to get started. You can ask about fitness, nutrition, or mental health.</p>
+                </div>
+            </div>
+
+            <!-- Input Form -->
+            <form id="health-form" class="mt-8 space-y-4">
+                <div>
+                    <label for="text-input" class="block text-sm font-medium text-gray-700 mb-1">Text Query</label>
+                    <textarea id="text-input" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200" placeholder="e.g., 'What are some good exercises for stress relief?'"></textarea>
+                </div>
+
+                <div>
+                    <label for="image-input" class="block text-sm font-medium text-gray-700 mb-1">Or Upload an Image</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="file" id="image-input" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"/>
+                        <span id="file-name" class="text-xs text-gray-400 truncate"></span>
+                    </div>
+                </div>
+
+                <button type="submit" id="submit-button" class="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200">
+                    Get Suggestions
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // JavaScript for handling form submission and API requests
+        const form = document.getElementById('health-form');
+        const textInput = document.getElementById('text-input');
+        const imageInput = document.getElementById('image-input');
+        const responseArea = document.getElementById('response-area');
+        const submitButton = document.getElementById('submit-button');
+        const fileNameSpan = document.getElementById('file-name');
+
+        // Update file name display when an image is selected
+        imageInput.addEventListener('change', () => {
+            if (imageInput.files.length > 0) {
+                fileNameSpan.textContent = imageInput.files[0].name;
+                textInput.value = ''; // Clear text input if an image is selected
+            } else {
+                fileNameSpan.textContent = '';
+            }
+        });
+
+        // Function to display a message on the UI
+        function displayMessage(message, isError = false) {
+            responseArea.innerHTML = `<p>${message}</p>`;
+            responseArea.classList.remove('text-gray-500', 'text-red-500');
+            responseArea.classList.add(isError ? 'text-red-500' : 'text-gray-800', 'message-box');
+            responseArea.classList.toggle('border-red-400', isError);
+            responseArea.classList.toggle('bg-red-50', isError);
+            responseArea.classList.toggle('border-gray-200', !isError);
+            responseArea.classList.toggle('bg-gray-50', !isError);
+        }
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            // Set up button and UI for loading state
+            submitButton.disabled = true;
+            submitButton.textContent = 'Getting Suggestions...';
+            displayMessage('Thinking...', false);
+
+            const textQuery = textInput.value;
+            const imageFile = imageInput.files[0];
+            let base64Image = null;
+
+            // Check for valid input
+            if (!textQuery && !imageFile) {
+                displayMessage('Please enter some text or upload an image.', true);
+                submitButton.disabled = false;
+                submitButton.textContent = 'Get Suggestions';
+                return;
+            }
+            
+            // Convert image to Base64 if it exists
+            if (imageFile) {
+                try {
+                    base64Image = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result.split(',')[1]);
+                        reader.onerror = error => reject(error);
+                        reader.readAsDataURL(imageFile);
+                    });
+                } catch (error) {
+                    displayMessage('Error reading the image file.', true);
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Get Suggestions';
+                    return;
+                }
+            }
+
+            const payload = {
+                text_input: textQuery || null,
+                image_data: base64Image || null
+            };
+
+            // Making the API call to the backend
+            try {
+                const response = await fetch('http://localhost:8000/api/health-suggestions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Display the received suggestions
+                if (data.success) {
+                    const textResponse = data.data.text_response.replace(/\n/g, '<br>');
+                    responseArea.innerHTML = `<p class="whitespace-pre-wrap">${textResponse}</p>`;
+                    responseArea.classList.remove('text-gray-500');
+                    responseArea.classList.add('text-gray-800', 'message-box');
+                } else {
+                    displayMessage('Error: Unable to get suggestions.', true);
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                displayMessage(`An error occurred: ${error.message}. Please ensure the backend server is running.`, true);
+            } finally {
+                // Reset button and UI state
+                submitButton.disabled = false;
+                submitButton.textContent = 'Get Suggestions';
+            }
+        });
+    </script>
+</body>
+</html>
